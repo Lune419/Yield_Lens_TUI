@@ -241,7 +241,11 @@ class KeyboardUI:
             self.execute(f'tol {tol} {count}')
 
     def view(self):
-        choice = self.menu('圖表／資料', ['查看分析圖表', '選取縮放範圍', '恢復全圖', '瀏覽原始資料'])
+        choice = self.menu('圖表／資料', ['開啟互動圖表視窗（框選放大／平移）', '選取終端縮放範圍', '恢復終端全圖', '瀏覽原始資料', '查看終端圖表'])
+        if choice == 0:
+            self.execute('plot')
+            self.notice('互動圖表', self.app.message+'\n在瀏覽器使用「框選放大」、滾輪與「拖曳平移」。\n更新 TUI 設定後，再開啟一次即可取得最新圖表。')
+            return
         if choice == 1:
             a, b = self.pair('縮放', (int(self.app.d.rows[0]), int(self.app.d.rows[-1])))
             x, _ = transformed(self.app.d, self.app.c)

@@ -381,6 +381,11 @@ class Dashboard:
         if cmd=='q':raise EOFError
         if cmd=='help':self.message=HELP;return
         if cmd=='files':self.message='\n'.join(f'{i+1}: {p}' for i,p in enumerate(self.paths));return
+        if cmd=='plot':
+            from plot_viewer import open_preview
+            path,opened=open_preview(self)
+            self.message=('已開啟互動圖表：' if opened else '預覽已儲存，請手動用瀏覽器開啟：')+str(path)
+            return
         if cmd=='use':self.load(int(args[0])-1);return
         if cmd in ('sheet','cols'):
             sh=int(args[0])-1 if cmd=='sheet' else d.sheet
