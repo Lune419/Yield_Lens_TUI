@@ -162,8 +162,8 @@ def analyze(d, c):
     result['fit'] = dict(slope=float(k), intercept=float(b), r_squared=r2,
                          rmse=rmse, rows=[int(d.rows[lo]), int(d.rows[hi])],
                          x_zero=float(-b/k))
-    if r2 < .995:
-        result['warnings'].append('R² < 0.995：線性擬合品質偏低，請重新選區間。')
+    if r2 < .975:
+        result['warnings'].append('R² < 0.975：線性擬合品質偏低，請重新選區間。')
     # Stop at material reversal rather than sorting or splicing separate cycles.
     reversals = np.flatnonzero(np.diff(x[hi:end+1]) < 0)
     search_end = hi + int(reversals[0]) if len(reversals) else end
