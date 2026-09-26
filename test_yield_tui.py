@@ -81,7 +81,7 @@ class Tests(unittest.TestCase):
             app.command(cmd)
         files=list(Path(self.tmp.name).rglob('*.json'))
         self.assertEqual(len(files),1)
-        r=json.loads(files[0].read_text())
+        r=json.loads(files[0].read_text(encoding='utf-8'))
         self.assertIsNotNone(r['offset'])
         self.assertIsNotNone(r['manual_yield'])
         self.assertIn('sample.1_',files[0].name)

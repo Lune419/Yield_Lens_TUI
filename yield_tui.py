@@ -470,8 +470,12 @@ class Dashboard:
         else:raise ValueError('不認識的指令；輸入 help 查看。')
         self.message='已更新；計算使用全部原始數值，沒有平滑或重排。'
 
-    def run(self):
+    def run(self, commands=False):
         interactive=sys.stdin.isatty() and sys.stdout.isatty()
+        if interactive and not commands:
+            from keyboard_ui import KeyboardUI
+            KeyboardUI(self).run()
+            return
         while True:
             try:
                 if interactive: print('\033[2J\033[H',end='')
@@ -487,6 +491,7 @@ def main():
     p=argparse.ArgumentParser(description='荷重／應力與應變判讀 TUI；資料完全在本機處理。')
     p.add_argument('paths',nargs='*',help='檔案或資料夾，可多個')
     p.add_argument('--output',default='results');p.add_argument('--no-color',action='store_true')
+    p.add_argument('--commands',action='store_true',help='使用傳統文字指令模式')
     args=p.parse_args();paths=[]
     for s in args.paths:
         path=Path(s)
@@ -498,7 +503,7 @@ def main():
     if not paths:p.error('請指定 XLS/XLSX/CSV/TSV 檔案或資料夾。')
     if os.name=='nt':
         os.system('')  # Enable ANSI on Windows Terminal / modern conhost.
-    try:Dashboard(list(dict.fromkeys(paths)),args.output,not args.no_color).run()
+    try:Dashboard(list(dict.fromkeys(paths)),args.output,not args.no_color).run(args.commands)
     except (ValueError,OSError,ImportError) as exc:
         p.exit(1,f'無法啟動：{exc}\n請先執行 python -m pip install -r requirements.txt\n')
 
