@@ -17,7 +17,7 @@ class PlotViewerTests(unittest.TestCase):
         x = np.linspace(0, .03, 301)
         y = np.where(x <= .005, 200000*x, 1000+1000*(x-.005))
         np.savetxt(self.path, np.c_[x, y], delimiter=',', header='X,Y', comments='')
-        self.app = Dashboard([self.path], str(Path(self.tmp.name)/'out'))
+        self.app = Dashboard([self.path], str(Path(self.tmp.name)/'out'), preferences_path=None)
         for command in ('x strain', 'y MPa', 'fit 4 40', 'yield 60'):
             self.app.command(command)
 

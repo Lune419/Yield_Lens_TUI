@@ -76,7 +76,7 @@ class Tests(unittest.TestCase):
         with self.assertRaises(ValueError):analyze(self.d,self.c)
 
     def test_export_and_dashboard_commands(self):
-        app=Dashboard([self.path],str(Path(self.tmp.name)/'out'),False)
+        app=Dashboard([self.path],str(Path(self.tmp.name)/'out'),False,preferences_path=None)
         for cmd in ['x strain','y MPa','fit 4 40','yield 60','view 0 .01','rows 4 8','export']:
             app.command(cmd)
         files=list(Path(self.tmp.name).rglob('*.json'))

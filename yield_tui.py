@@ -13,11 +13,13 @@ from pathlib import Path
 import re
 import shutil
 import sys
+import tempfile
 from datetime import datetime
 from dataclasses import dataclass, asdict
 import numpy as np
 
 VERSION = '1.0.0'
+UNIT_PREFERENCES = Path(__file__).with_name('.yield_lens_units.json')
 
 
 @dataclass
@@ -344,15 +346,55 @@ def export_result(d, c, result, out):
 
 
 class Dashboard:
-    def __init__(self, paths, output='results', color=True):
+    def __init__(self, paths, output='results', color=True, preferences_path=UNIT_PREFERENCES):
         self.paths=paths; self.index=0; self.cache={};self.output=output;self.color=color
         self.view=None;self.message='先確認 X/Y 單位，再選線性区間。help 可查看所有指令。'
+        self.preferences_path=Path(preferences_path) if preferences_path is not None else None
+        self.unit_defaults={}
+        if self.preferences_path is not None:
+            try:
+                saved=json.loads(self.preferences_path.read_text(encoding='utf-8'))
+                mode,unit=saved['xmode'],saved['yunit']
+                xf,yf=saved['xfactor'],saved['yfactor']
+                fixed={'unknown':1,'strain':1,'percent':.01,'micro':1e-6}
+                if mode not in (*fixed,'tensile','custom') or unit not in ('unknown','N','kN','kgf','MPa'):
+                    raise ValueError('未知單位')
+                if any(type(v) not in (int,float) or not math.isfinite(v) or v<=0 for v in (xf,yf)):
+                    raise ValueError('無效係數')
+                if mode in fixed and xf!=fixed[mode]:raise ValueError('單位與係數不一致')
+                self.unit_defaults=dict(xmode=mode,xfactor=xf,yunit=unit,yfactor=yf)
+                self.message='已沿用上次 X/Y 單位與換算係數；資料單位有變時請修改。'
+            except FileNotFoundError:pass
+            except (OSError,ValueError,KeyError,TypeError):
+                self.message='無法讀取單位記憶，請重新選擇 X/Y 單位。'
         self.load(0)
+
+    def new_config(self,d):
+        config=default_config(d)
+        for key,value in self.unit_defaults.items():setattr(config,key,value)
+        return config
+
+    def remember_units(self):
+        self.unit_defaults={key:getattr(self.c,key) for key in ('xmode','xfactor','yunit','yfactor')}
+        if self.preferences_path is None:return
+        temporary=None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w',encoding='utf-8',dir=self.preferences_path.parent,
+                                             prefix='.yield_units_',suffix='.tmp',delete=False) as stream:
+                temporary=Path(stream.name)
+                json.dump(self.unit_defaults,stream,ensure_ascii=False,indent=2,allow_nan=False)
+            temporary.replace(self.preferences_path)
+        except OSError:
+            self.message='單位已套用於本次工作，但無法儲存到本機；下次啟動需重新設定。'
+        finally:
+            if temporary is not None:
+                try:temporary.unlink(missing_ok=True)
+                except OSError:pass
 
     def load(self,index):
         if not 0<=index<len(self.paths): raise ValueError('檔案編號不存在。')
         if index not in self.cache:
-            d=read_data(self.paths[index]);self.cache[index]=(d,default_config(d))
+            d=read_data(self.paths[index]);self.cache[index]=(d,self.new_config(d))
         self.index=index;self.d,self.c=self.cache[index];self.view=None
 
     def render(self):
@@ -391,7 +433,7 @@ class Dashboard:
             sh=int(args[0])-1 if cmd=='sheet' else d.sheet
             cols=tuple(map(int,args)) if cmd=='cols' else d.columns
             if len(cols)!=2:raise ValueError('cols 需要兩個欄號。')
-            nd=read_data(d.path,sh,cols);self.d=nd;self.c=default_config(nd)
+            nd=read_data(d.path,sh,cols);self.d=nd;self.c=self.new_config(nd)
             self.cache[self.index]=(self.d,self.c);self.view=None
         elif cmd=='sign':
             sx,sy=map(int,args)
@@ -474,6 +516,7 @@ class Dashboard:
             self.message=f'已匯出到 {output.resolve()}（未載入檔案會列為未分析）';return
         else:raise ValueError('不認識的指令；輸入 help 查看。')
         self.message='已更新；計算使用全部原始數值，沒有平滑或重排。'
+        if cmd in ('x','y'):self.remember_units()
 
     def run(self, commands=False):
         interactive=sys.stdin.isatty() and sys.stdout.isatty()

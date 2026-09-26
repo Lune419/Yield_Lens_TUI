@@ -21,7 +21,7 @@ class KeyboardTests(unittest.TestCase):
         x = np.linspace(0, .03, 301)
         y = np.where(x <= .005, 200000*x, 1000+1000*(x-.005))
         np.savetxt(self.path, np.c_[x, y], delimiter=',', header='X,Y', comments='')
-        self.app = Dashboard([self.path], str(Path(self.tmp.name)/'out'), False)
+        self.app = Dashboard([self.path], str(Path(self.tmp.name)/'out'), False, preferences_path=None)
 
     def ui(self, keys):
         iterator = iter(keys)
@@ -77,7 +77,8 @@ class KeyboardTests(unittest.TestCase):
         self.app.command('x strain')
         self.ui(['enter', 'down', 'enter']).source()
         self.assertEqual(self.app.index, 1)
-        self.assertEqual(self.app.c.xmode, 'unknown')
+        self.assertEqual(self.app.c.xmode, 'strain')
+        self.app.command('x percent')
         self.ui(['enter', 'up', 'enter']).source()
         self.assertEqual(self.app.c.xmode, 'strain')
 
@@ -88,6 +89,46 @@ class KeyboardTests(unittest.TestCase):
             ui.screen('中文測試', ['資料'*100]*50)
         self.assertLess(len(output.getvalue().splitlines()), 15)
         self.assertEqual(clipped('中文abcd', 5), '中文a')
+
+    def test_units_survive_restart_without_copying_analysis(self):
+        prefs = Path(self.tmp.name)/'units.json'
+        first = Dashboard([self.path], preferences_path=prefs)
+        for command in ('x tensile 50', 'y custom 0.25 MPa', 'fit 4 40', 'zero 2'):
+            first.command(command)
+        restarted = Dashboard([self.path], preferences_path=prefs)
+        self.assertEqual((restarted.c.xmode, restarted.c.xfactor), ('tensile', .02))
+        self.assertEqual((restarted.c.yunit, restarted.c.yfactor), ('MPa', .25))
+        self.assertIsNone(restarted.c.fit_rows)
+        self.assertIsNone(restarted.c.zero_row)
+        restarted.command('x unknown')
+        self.assertEqual(Dashboard([self.path], preferences_path=prefs).c.xmode, 'unknown')
+
+    def test_sheet_and_columns_inherit_units(self):
+        self.app.command('x percent')
+        self.app.command('y N')
+        self.app.command('fit 4 40')
+        self.app.command('sheet 1')
+        self.assertEqual((self.app.c.xmode, self.app.c.xfactor), ('percent', .01))
+        self.assertEqual(self.app.c.yunit, 'N')
+        self.assertIsNone(self.app.c.fit_rows)
+        self.app.command('cols 1 2')
+        self.assertEqual(self.app.c.xmode, 'percent')
+
+    def test_invalid_unit_memory_falls_back(self):
+        prefs = Path(self.tmp.name)/'units.json'
+        for content in ('invalid json', '{"xmode":"percent","xfactor":1,"yunit":"N","yfactor":1}',
+                        '{"xmode":"custom","xfactor":-1,"yunit":"N","yfactor":1}'):
+            prefs.write_text(content, encoding='utf-8')
+            app = Dashboard([self.path], preferences_path=prefs)
+            self.assertEqual(app.c.xmode, 'unknown')
+            self.assertIn('重新選擇', app.message)
+
+    def test_failed_save_keeps_units_in_session(self):
+        prefs = Path(self.tmp.name)/'missing'/'units.json'
+        app = Dashboard([self.path], preferences_path=prefs)
+        app.command('x custom 0.001')
+        self.assertEqual(app.unit_defaults['xfactor'], .001)
+        self.assertIn('無法儲存', app.message)
 
     @unittest.skipUnless(os.name == 'nt', 'Windows key decoding')
     def test_windows_arrow_decoding(self):

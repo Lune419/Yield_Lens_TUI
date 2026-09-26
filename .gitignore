@@ -1,4 +1,6 @@
 .venv/
+.yield_lens_units.json
+.yield_units_*.tmp
 __pycache__/
 *.py[cod]
 *.egg-info/

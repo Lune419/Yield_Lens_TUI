@@ -276,7 +276,7 @@ class KeyboardUI:
         while True:
             try:
                 c = self.app.c
-                options = ['資料來源／檔案／工作表／欄位', f'單位設定  X={c.xmode}  Y={c.yunit}',
+                options = ['資料來源／檔案／工作表／欄位', f'單位設定（自動記憶） X={c.xmode} ×{c.xfactor:g}  Y={c.yunit} ×{c.yfactor:g}',
                            f'線性擬合  {c.fit_rows or "尚未設定"}', f'手動降伏點  {c.yield_row or "尚未設定"}',
                            '圖表／縮放／瀏覽資料', '分析設定／方向／歸零／門檻', '匯出 JSON / CSV / SVG', '操作說明', '離開']
                 selected = self.menu('↑↓ 導覽主要工作；Enter 開啟', options, selected)
