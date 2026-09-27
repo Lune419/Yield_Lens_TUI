@@ -327,6 +327,42 @@ class KeyboardUI:
             destination = save_mapping(report, self.app.output)
             self.notice('已另存對照結果', str(destination)+'\n原本的 result 資料夾沒有修改。')
 
+    def maximum_stress(self):
+        from maximum_stress import find_maximum, describe_maximum, save_maximum
+        from yield_tui import read_data
+        path = self.choose_path('選擇要搜尋最大應力的 stress 檔', Path(self.app.d.path).parent)
+        if path.suffix.lower() == '.xls':
+            import xlrd
+            book = xlrd.open_workbook(str(path), on_demand=True)
+            try:names = book.sheet_names()
+            finally:book.release_resources()
+        elif path.suffix.lower() == '.xlsx':
+            import openpyxl
+            book = openpyxl.load_workbook(path, read_only=True)
+            try:names = book.sheetnames
+            finally:book.close()
+        else:names = ['CSV / TSV']
+        sheet = self.menu('stress 工作表', names)
+        xcol = self.number('stress 的 X 欄號', 1, 1, integer=True)
+        ycol = self.number('stress 的應力欄號', 2, 1, integer=True)
+        units = ['unknown', 'MPa', 'Pa', 'kPa', 'GPa']
+        unit = units[self.menu('stress 原始單位（僅標示，不換算）', ['未知', 'MPa', 'Pa', 'kPa', 'GPa'])]
+        direction = [1, -1][self.menu('應力方向：負值表示正向加載時請選反向',
+                                     ['保留原始方向 (+1)', '反向 (-1)'], 0 if self.app.c.sy==1 else 1)]
+        rows = None
+        if self.menu('最大應力搜尋範圍', ['整張工作表', '指定原始列範圍']) == 1:
+            data = read_data(path, sheet, (xcol, ycol))
+            start = self.number('搜尋起列（原始 Excel 列號）', int(data.rows[0]),
+                                int(data.rows[0]), int(data.rows[-1]), True)
+            end = self.number('搜尋末列（原始 Excel 列號）', int(data.rows[-1]),
+                              int(data.rows[0]), int(data.rows[-1]), True)
+            rows = (start, end)
+        report = find_maximum(path, sheet, (xcol, ycol), direction, unit, rows)
+        self.notice('最大應力結果', describe_maximum(report))
+        if self.menu('保存最大應力結果？', ['另存 maximum.json / maximum.csv', '返回，不儲存']) == 0:
+            destination = save_maximum(report, self.app.output)
+            self.notice('已另存最大應力結果', str(destination))
+
     def loop(self):
         selected = 0
         while True:
@@ -335,7 +371,7 @@ class KeyboardUI:
                 options = ['資料來源／檔案／工作表／欄位', f'單位設定（自動記憶） X={c.xmode} ×{c.xfactor:g}  Y={c.yunit} ×{c.yfactor:g}',
                            f'線性擬合  {c.fit_rows or "尚未設定"}', f'手動降伏點  {c.yield_row or "尚未設定"}',
                            '圖表／縮放／瀏覽資料', '分析設定／方向／歸零／門檻', '匯出 JSON / CSV / SVG', '操作說明', '離開',
-                           '既有 result → stress 對照']
+                           '既有 result → stress 對照', '搜尋最大應力／資料位置']
                 selected = self.menu('↑↓ 導覽主要工作；Enter 開啟', options, selected)
                 if selected == 0: self.source()
                 elif selected == 1: self.units()
@@ -355,6 +391,7 @@ class KeyboardUI:
                         self.execute('export'); self.notice('匯出完成', self.app.message)
                     if action: return
                 elif selected == 9:self.stress_mapping()
+                elif selected == 10:self.maximum_stress()
             except Cancel:
                 continue
             except (ValueError, OSError, IndexError, ImportError) as exc:

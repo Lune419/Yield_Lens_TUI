@@ -110,14 +110,14 @@ def describe_mapping(report):
     ])
 
 
-def save_mapping(report, output='results'):
-    directory = Path(output)/('stress_mapping_'+datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
+def save_mapping(report, output='results', prefix='stress_mapping', filename='mapping'):
+    directory = Path(output)/(prefix+'_'+datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
     directory.mkdir(parents=True, exist_ok=False)
-    (directory/'mapping.json').write_text(json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False), encoding='utf-8')
-    with (directory/'mapping.csv').open('w', encoding='utf-8-sig', newline='') as stream:
+    (directory/(filename+'.json')).write_text(json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False), encoding='utf-8')
+    with (directory/(filename+'.csv')).open('w', encoding='utf-8-sig', newline='') as stream:
         writer = csv.DictWriter(stream, fieldnames=list(report))
         writer.writeheader()
-        writer.writerow({key:json.dumps(value, ensure_ascii=False) if isinstance(value, list) else value for key,value in report.items()})
+        writer.writerow({key:json.dumps(value, ensure_ascii=False) if isinstance(value, (list,dict)) else value for key,value in report.items()})
     return directory.resolve()
 
 

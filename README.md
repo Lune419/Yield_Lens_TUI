@@ -43,6 +43,20 @@ python yield_tui.py "sample_a.xls" "sample_b.xls" --output results
 
 下方的文字指令仍可在傳統模式使用：`python yield_tui.py --commands`。非互動輸入也會自動使用傳統模式。
 
+## 搜尋最大應力
+
+主選單第 11 項「搜尋最大應力／資料位置」可直接選擇 XLS／XLSX／CSV／TSV 的 stress 檔，不必先產生 offset result。選擇工作表、X／應力欄位、單位與方向後，可搜尋整張工作表或指定原始列範圍。
+
+結果顯示方向換算後的最大應力、原始應力值、原始 X、原始 Excel 列號及第幾筆有效資料。同值最大點會全部列出；空白列與標題不算有效資料筆數。搜尋只乘方向 +1／−1，不取絕對值、不內插；若加載資料是負值，請選反向 -1。
+
+可另存 `maximum_stress_時間戳記/maximum.json` 與 `maximum.csv`。命令列亦可使用：
+
+```sh
+python maximum_stress.py "raw/1 stress.xls" --direction -1 --unit MPa
+```
+
+可加 `--sheet 2`、`--cols 1 2`、`--rows 2 1000` 或 `--output results`。單位只標示、不換算，未設定單位會顯示未知。
+
 ## 既有 result → stress 對照
 
 主選單第 10 項可直接使用先前匯出的 offset 結果，不必重新擬合：
