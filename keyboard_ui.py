@@ -2,6 +2,7 @@
 from contextlib import contextmanager
 import math
 import os
+from pathlib import Path
 import shutil
 import sys
 import unicodedata
@@ -271,6 +272,61 @@ class KeyboardUI:
             lines += result['warnings']
             self.notice('分析圖表（O offset / C 偏離候選 / Y 手動降伏）', '\n'.join(lines))
 
+    def choose_path(self, title, start, folder=False, suffixes=('.xls', '.xlsx', '.csv', '.tsv')):
+        current = Path(start).resolve()
+        if not current.is_dir():current = current.parent
+        while True:
+            entries = sorted((p for p in current.iterdir() if p.is_dir() or
+                              (not folder and p.suffix.lower() in suffixes and not p.name.startswith('~$'))),
+                             key=lambda p:(not p.is_dir(), p.name.casefold()))
+            options = (['選擇目前資料夾'] if folder else []) + ['↑ 上一層資料夾']
+            options += [('[資料夾] ' if p.is_dir() else '')+p.name for p in entries]
+            choice = self.menu(f'{title}：{current}', options)
+            if folder and choice == 0:return current
+            choice -= int(folder)
+            if choice == 0:
+                current = current.parent
+                continue
+            selected = entries[choice-1]
+            if selected.is_dir():current = selected
+            else:return selected
+
+    def stress_mapping(self):
+        from result_mapping import load_result, verify_source, map_stress, describe_mapping, save_mapping
+        folder = self.choose_path('1/4 選擇既有 result 資料夾', self.app.output, folder=True)
+        files = sorted(folder.glob('*.json'))
+        if not files:raise ValueError('這個資料夾沒有結果 JSON；請選擇原始匯出的時間戳記資料夾。')
+        result_file = files[self.menu('選擇要對照的結果', [p.name for p in files])]
+        result = load_result(result_file)
+        source = Path(result.get('source', ''))
+        initial = source.parent if source.is_file() else Path(self.app.d.path).parent
+        w_file = self.choose_path('2/4 選擇產生 result 的 W 原始檔', initial)
+        verify_source(result, w_file)
+        stress_file = self.choose_path('3/4 選擇配套 stress 檔', w_file.parent)
+        if stress_file.suffix.lower() == '.xls':
+            import xlrd
+            book = xlrd.open_workbook(str(stress_file), on_demand=True)
+            try:names = book.sheet_names()
+            finally:book.release_resources()
+        elif stress_file.suffix.lower() == '.xlsx':
+            import openpyxl
+            book = openpyxl.load_workbook(stress_file, read_only=True)
+            try:names = book.sheetnames
+            finally:book.close()
+        else:names = ['CSV / TSV']
+        sheet = self.menu('stress 工作表', names)
+        xcol = self.number('stress 的 X 欄號', 1, 1, integer=True)
+        ycol = self.number('stress 的應力欄號', 2, 1, integer=True)
+        units = ['unknown', 'MPa', 'Pa', 'kPa', 'GPa']
+        unit = units[self.menu('stress 原始單位（僅標示，不換算）', ['未知', 'MPa', 'Pa', 'kPa', 'GPa'])]
+        directions = [result['settings']['sy'], 1, -1]
+        direction = directions[self.menu('stress 方向', [f'沿用 result Y 方向 ({directions[0]:+d})', '保留原始方向 (+1)', '反向 (-1)'])]
+        report = map_stress(result_file, w_file, stress_file, sheet, (xcol, ycol), direction, unit)
+        self.notice('4/4 stress 對照結果', describe_mapping(report))
+        if self.menu('保存對照結果？', ['另存 mapping.json / mapping.csv', '返回，不儲存']) == 0:
+            destination = save_mapping(report, self.app.output)
+            self.notice('已另存對照結果', str(destination)+'\n原本的 result 資料夾沒有修改。')
+
     def loop(self):
         selected = 0
         while True:
@@ -278,7 +334,8 @@ class KeyboardUI:
                 c = self.app.c
                 options = ['資料來源／檔案／工作表／欄位', f'單位設定（自動記憶） X={c.xmode} ×{c.xfactor:g}  Y={c.yunit} ×{c.yfactor:g}',
                            f'線性擬合  {c.fit_rows or "尚未設定"}', f'手動降伏點  {c.yield_row or "尚未設定"}',
-                           '圖表／縮放／瀏覽資料', '分析設定／方向／歸零／門檻', '匯出 JSON / CSV / SVG', '操作說明', '離開']
+                           '圖表／縮放／瀏覽資料', '分析設定／方向／歸零／門檻', '匯出 JSON / CSV / SVG', '操作說明', '離開',
+                           '既有 result → stress 對照']
                 selected = self.menu('↑↓ 導覽主要工作；Enter 開啟', options, selected)
                 if selected == 0: self.source()
                 elif selected == 1: self.units()
@@ -297,6 +354,7 @@ class KeyboardUI:
                     if action == 1:
                         self.execute('export'); self.notice('匯出完成', self.app.message)
                     if action: return
+                elif selected == 9:self.stress_mapping()
             except Cancel:
                 continue
             except (ValueError, OSError, IndexError, ImportError) as exc:

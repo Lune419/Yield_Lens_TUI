@@ -547,7 +547,11 @@ def main():
     if not paths:
         paths=sorted(Path('.').glob('*.xls'))+sorted(Path('.').glob('*.xlsx'))+sorted(Path('.').glob('*.csv'))
     if not paths:
-        paths=sorted((Path(__file__).parent/'example').glob('*.xls'))
+        for folder in ('raw','example'):
+            directory=Path(__file__).parent/folder
+            if directory.is_dir():
+                paths=sorted(q for q in directory.iterdir() if q.is_file() and q.suffix.lower() in ('.xls','.xlsx','.csv','.tsv') and not q.name.startswith('~$'))
+            if paths:break
     if not paths:p.error('請指定 XLS/XLSX/CSV/TSV 檔案或資料夾。')
     if os.name=='nt':
         os.system('')  # Enable ANSI on Windows Terminal / modern conhost.

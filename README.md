@@ -43,6 +43,29 @@ python yield_tui.py "sample_a.xls" "sample_b.xls" --output results
 
 下方的文字指令仍可在傳統模式使用：`python yield_tui.py --commands`。非互動輸入也會自動使用傳統模式。
 
+## 既有 result → stress 對照
+
+主選單第 10 項可直接使用先前匯出的 offset 結果，不必重新擬合：
+
+1. 用方向鍵瀏覽資料夾，選擇包含結果 JSON 的時間戳記資料夾，再選擇該次結果。
+2. 選擇產生該結果的 W 原始檔。即使檔案搬家或改名，只要檔案內容指紋一致即可；不同試驗的同名檔案會被拒絕。
+3. 選擇配套 stress 檔、工作表、X／應力欄號，確認應力單位與方向。單位只標示，不自動換算；預設方向沿用 result 的 Y 方向，也可保留原始方向或反向。
+4. 顯示 W 與 stress 的兩側原始列號、有效資料編號、內插比例、兩側 stress 原始值、原始內插值及方向換算值。Enter 返回後可另存 `mapping.json`／`mapping.csv`。
+
+程式核對 W 指紋、結果筆數與交點座標，再確認 W／stress 有相同有效筆數及逐筆原始 X（容差 rtol=1e-9、atol=1e-12）。兩份檔案標題列數可以不同，會以有效資料順序對照，分別記錄原始列號。筆數或 X 不一致時停止，不猜測配對。
+
+stress 值依 JSON 的相鄰點與比例計算 `S = S左 + fraction × (S右 − S左)`，屬於內插估算，不是單筆實測值。原始正負號保留，方向換算僅乘 +1 或 −1，不套用 W 的荷重係數／歸零。對照輸出存入獨立的 `stress_mapping_時間戳記` 資料夾，原本匯出檔不改寫。
+
+亦可不啟動 TUI，直接使用命令列（含空格的路徑請加引號）：
+
+```sh
+python result_mapping.py "results/某次匯出/1_w_ba58a5d4.json" "raw/1 w.xls" "raw/1 stress.xls" --unit MPa
+```
+
+可加 `--sheet 2`、`--cols 1 2`、`--direction -1`、`--output results`。未指定單位會標為未知，未指定方向則沿用 result 的 Y 方向。
+
+直接雙擊啟動時，如果程式同層沒有資料，會先掃描 `raw` 再掃描 `example`，兩者都支援 XLS／XLSX／CSV／TSV，且只掃描第一層。
+
 ## 獨立互動圖表
 
 在 TUI 選擇 **圖表／縮放／瀏覽資料 → 開啟互動圖表視窗**，即可在預設瀏覽器另外開啟漂亮的分析圖表。瀏覽器可能依個人設定使用新視窗或新分頁。原本的 TUI 可以繼續操作；傳統指令模式可輸入 `plot`。
